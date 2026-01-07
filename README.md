@@ -52,10 +52,10 @@ git clone https://github.com/yourusername/fwifi-tool.git
 cd fwifi-tool
 
 # Install dependencies
-pip install -r requirements.txt
+pip3 install pywifi
 
 # Run on Linux (requires root)
-sudo python3 fwifi.py
+sudo python3 F_WiFi.py
 ```
 
 ### **System Requirements**
@@ -209,14 +209,6 @@ We welcome contributions from the security community:
 - Community-voted "Best Open Source Security Tool 2023"
 - Contributor to OWASP projects
 
-## 📞 Contact & Support
-
-### **Primary Contact**
-- **Developer**: Varun
-- **Email**: security@example.com
-- **LinkedIn**: https://linkedin.com/in/pentester-varun
-- **Twitter**: @EthicalFWIFI
-
 ### **Security Reports**
 For vulnerability disclosures:
 1. Email: security@example.com
@@ -241,4 +233,4 @@ For commercial licensing or enterprise support, contact the development team.
 
 ---
 
-*Last Updated: January 2024 | Version: 3.1 | Contributors: 15+ | Stars: 250+*
+
