@@ -209,13 +209,6 @@ We welcome contributions from the security community:
 - Community-voted "Best Open Source Security Tool 2023"
 - Contributor to OWASP projects
 
-### **Security Reports**
-For vulnerability disclosures:
-1. Email: security@example.com
-2. Use encrypted PGP key
-3. Allow 48-hour response time
-4. Follow responsible disclosure
-
 ## 📄 License
 
 Released under the **MIT License** - see [LICENSE](LICENSE) file for details.
